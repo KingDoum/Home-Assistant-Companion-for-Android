@@ -23,12 +23,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.2.0
 
       - name: Update dependency locks
-        run: ./gradlew :app:dependencies --write-locks
+        run: ./gradlew :app:dependencies --write-locks --no-configuration-cache
 
       - name: Build Full Debug APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleFullDebug --stacktrace
+          ./gradlew assembleFullDebug --stacktrace --no-configuration-cache
         env:
           SENTRY_DSN: ""
 
