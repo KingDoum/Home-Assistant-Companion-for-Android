@@ -244,27 +244,33 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
     }
 
     var mLocationClient: AMapLocationClient? = null
-    private var mLocationListener = AMapLocationListener { location ->
-        if (location.getErrorCode() == 0) {
-            amapLocation = location
-            Log.d(TAG, "Amap Location -- ${location.latitude}")
+    private var mLocationListener = AMapLocationListener { aMapLocation ->
+        if (aMapLocation.getErrorCode() == 0) {
+            amapLocation = aMapLocation
+            Log.d(TAG, "Amap Location -- ${aMapLocation.latitude}")
             addressUpdata(context = latestContext)
-            val gps = listOf(location.latitude, location.longitude)
-            val locationUpdate = UpdateLocation(
-                gps = gps,
-                gpsAccuracy = location.accuracy.toIntOrNull(),
-                locationName = "高德定位",
-                inZones = null,
-                speed = location.speed.toIntOrNull(),
-                altitude = location.altitude.toIntOrNull(),
-                course = location.bearing.toIntOrNull(),
-                verticalAccuracy = if (Build.VERSION.SDK_INT >= 26) location.verticalAccuracyMeters.toIntOrNull() else null,
-                time = location.time,
-                gpsTime = null
-            )
-            sendLocationUpdate(latestContext, locationUpdate, backgroundLocation, "location_update", true)
+            val location = Location("amap").apply {
+                latitude = aMapLocation.latitude
+                longitude = aMapLocation.longitude
+                accuracy = aMapLocation.accuracy
+                if (aMapLocation.speed != 0f) speed = aMapLocation.speed
+                if (aMapLocation.bearing != 0f) bearing = aMapLocation.bearing
+                if (Build.VERSION.SDK_INT >= 26 && aMapLocation.verticalAccuracyMeters != 0f) {
+                    verticalAccuracyMeters = aMapLocation.verticalAccuracyMeters
+                }
+            }
+            val servers = serverManager(latestContext).getServers()
+            for (server in servers) {
+                ioScope.launch {
+                    sendLocationUpdate(
+                        location = location,
+                        serverId = server.id,
+                        wifi = false
+                    )
+                }
+            }
         } else {
-            Log.e(TAG, "Amap Location Error: ${location.getErrorCode()}, ${location.getErrorInfo()}")
+            Log.e(TAG, "Amap Location Error: ${aMapLocation.getErrorCode()}, ${aMapLocation.getErrorInfo()}")
         }
     }
 
