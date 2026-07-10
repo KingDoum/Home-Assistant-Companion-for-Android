@@ -248,7 +248,7 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
         if (aMapLocation.getErrorCode() == 0) {
             amapLocation = aMapLocation
             Log.d(TAG, "Amap Location -- ${aMapLocation.latitude}")
-            addressUpdata(context = latestContext)
+            ioScope.launch { addressUpdata(context = latestContext) }
             val location = Location("amap").apply {
                 latitude = aMapLocation.latitude
                 longitude = aMapLocation.longitude
@@ -259,9 +259,9 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
                     verticalAccuracyMeters = aMapLocation.verticalAccuracyMeters
                 }
             }
-            val servers = serverManager(latestContext).getServers()
-            for (server in servers) {
-                ioScope.launch {
+            ioScope.launch {
+                val servers = serverManager(latestContext).servers()
+                for (server in servers) {
                     sendLocationUpdate(
                         location = location,
                         serverId = server.id,
@@ -1204,7 +1204,7 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
             )
     }
 
-    private fun addressUpdata(context: Context) {
+    private suspend fun addressUpdata(context: Context) {
         var addressStr = amapLocation!!.address
         val attributes = amapLocation.let {
             mapOf(
