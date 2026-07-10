@@ -50,6 +50,7 @@ import io.homeassistant.companion.android.database.location.LocationHistoryItemT
 import io.homeassistant.companion.android.database.sensor.Attribute
 import io.homeassistant.companion.android.database.sensor.SensorSetting
 import io.homeassistant.companion.android.database.sensor.SensorSettingType
+import io.homeassistant.companion.android.database.AppDatabase
 import io.homeassistant.companion.android.database.sensor.toSensorWithAttributes
 import io.homeassistant.companion.android.location.HighAccuracyLocationService
 import io.homeassistant.companion.android.notifications.MessagingManager
@@ -70,6 +71,7 @@ var lastTime2 = 0L
 class LocationSensorManager :  BroadcastReceiver(), SensorManager {
 
     companion object {
+        private const val TAG = "LocationAMAP"
         private const val SETTING_SEND_LOCATION_AS = "location_send_as"
         private const val SETTING_ACCURACY = "location_minimum_accuracy"
         private const val SETTING_ACCURATE_UPDATE_TIME = "location_minimum_time_updates"
