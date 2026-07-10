@@ -22,10 +22,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.2.0
 
-      - name: Build Full Debug APK
+      - name: Update dependency locks
         run: |
           chmod +x gradlew
-          ./gradlew assembleFullDebug --stacktrace
+          ./gradlew :app:dependencies --write-locks --no-daemon
+
+      - name: Build Full Debug APK
+        run: |
+          ./gradlew assembleFullDebug --stacktrace --no-daemon
         env:
           SENTRY_DSN: ""
 
