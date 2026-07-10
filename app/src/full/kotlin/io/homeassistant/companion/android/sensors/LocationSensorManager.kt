@@ -179,30 +179,6 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
         private var lastHighAccuracyTriggerRange: Int = 0
         private var lastHighAccuracyZones: List<String> = ArrayList()
 
-            var mLocationClient: AMapLocationClient? = null
-    private var mLocationListener = AMapLocationListener { location ->
-        if (location.errorCode == 0) {
-            amapLocation = location
-            Log.d(TAG, "Amap Location -- ${location.latitude}")
-            addressUpdata(context = latestContext)
-
-            val locationUpdate = UpdateLocation(
-                locationName = "高德定位",
-                latitude = location.latitude,
-                longitude = location.longitude,
-                gpsAccuracy = if (location.accuracy != 0.0) location.accuracy else null,
-                speed = if (location.speed != 0f) location.speed else null,
-                altitude = if (location.altitude != 0.0) location.altitude else null,
-                course = if (location.bearing != 0f) location.bearing else null,
-                verticalAccuracy = if (Build.VERSION.SDK_INT >= 26) location.verticalAccuracyMeters else null
-            )
-            sendLocationUpdate(latestContext, locationUpdate, backgroundLocation, "location_update", true)
-        } else {
-            Log.e(TAG, "Amap Location Error: ${location.errorCode}, ${location.errorInfo}")
-        }
-    }
-
-    var amapLocation: AMapLocation? = null
 
         enum class LocationUpdateTrigger(val isGeofence: Boolean = false) {
             HIGH_ACCURACY_LOCATION,
@@ -266,6 +242,33 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
             }
         }
     }
+
+    var mLocationClient: AMapLocationClient? = null
+    private var mLocationListener = AMapLocationListener { location ->
+        if (location.getErrorCode() == 0) {
+            amapLocation = location
+            Log.d(TAG, "Amap Location -- ${location.latitude}")
+            addressUpdata(context = latestContext)
+            val gps = listOf(location.latitude, location.longitude)
+            val locationUpdate = UpdateLocation(
+                gps = gps,
+                gpsAccuracy = location.accuracy.toIntOrNull(),
+                locationName = "高德定位",
+                inZones = null,
+                speed = location.speed.toIntOrNull(),
+                altitude = location.altitude.toIntOrNull(),
+                course = location.bearing.toIntOrNull(),
+                verticalAccuracy = if (Build.VERSION.SDK_INT >= 26) location.verticalAccuracyMeters.toIntOrNull() else null,
+                time = location.time,
+                gpsTime = null
+            )
+            sendLocationUpdate(latestContext, locationUpdate, backgroundLocation, "location_update", true)
+        } else {
+            Log.e(TAG, "Amap Location Error: ${location.getErrorCode()}, ${location.getErrorInfo()}")
+        }
+    }
+
+    var amapLocation: AMapLocation? = null
 
     private val ioScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
