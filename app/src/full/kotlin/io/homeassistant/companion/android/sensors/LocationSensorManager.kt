@@ -249,9 +249,10 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
             amapLocation = aMapLocation
             Log.d(TAG, "Amap Location -- ${aMapLocation.latitude}")
             ioScope.launch { addressUpdata(context = latestContext) }
+            val wgsResult = GCJ2WGS.delta(aMapLocation.latitude, aMapLocation.longitude)
             val location = Location("amap").apply {
-                latitude = aMapLocation.latitude
-                longitude = aMapLocation.longitude
+                latitude = wgsResult["lat"] ?: aMapLocation.latitude
+                longitude = wgsResult["lon"] ?: aMapLocation.longitude
                 accuracy = aMapLocation.accuracy
                 if (aMapLocation.speed != 0f) speed = aMapLocation.speed
                 if (aMapLocation.bearing != 0f) bearing = aMapLocation.bearing
@@ -692,7 +693,9 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
     }
 
     private fun removeBackgroundUpdateRequests() {
-        //mLocationClient?.stopLocation()
+        mLocationClient?.stopLocation()
+        mLocationClient?.onDestroy()
+        mLocationClient = null
     }
 
     private suspend fun requestLocationUpdates() {
