@@ -35,4 +35,3 @@ jobs:
           name: ha-android-full-debug
           path: app/build/outputs/apk/full/debug/*.apk
           retention-days: 30
-          retention-days: 30
