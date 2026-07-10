@@ -62,7 +62,7 @@ android {
 dependencies {
     // Most of the dependencies are coming from the convention plugin to avoid duplication with `:automotive` module.
     "fullImplementation"(libs.car.projected)
-    //"fullImplementation"(libs.amap)
+    "fullImplementation"(libs.amap)
 
     screenshotTestImplementation(libs.compose.uiTooling)
 }

@@ -24,10 +24,10 @@ import android.text.TextUtils
 import android.util.Log
 import androidx.annotation.RequiresApi
 
-//import com.amap.api.location.AMapLocation
-//import com.amap.api.location.AMapLocationClient
-//import com.amap.api.location.AMapLocationClientOption
-//import com.amap.api.location.AMapLocationListener
+import com.amap.api.location.AMapLocation
+import com.amap.api.location.AMapLocationClient
+import com.amap.api.location.AMapLocationClientOption
+import com.amap.api.location.AMapLocationListener
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
@@ -177,6 +177,44 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
 
         private var lastHighAccuracyTriggerRange: Int = 0
         private var lastHighAccuracyZones: List<String> = ArrayList()
+
+        var mLocationClient: AMapLocationClient? = null
+        private var mLocationListener = AMapLocationListener { location ->
+            if (location.errorCode == 0) {
+                amapLocation = location
+                Log.d(TAG, "Amap Location -- ${location.latitude}")
+                addressUpdata(context = latestContext)
+                val sensorDao = AppDatabase.getInstance(latestContext).sensorDao()
+                val sensorSettings = sensorDao.getSettings(backgroundLocation.id)
+                val minAccuracy = sensorSettings
+                    .firstOrNull { it.name == SETTING_ACCURACY }?.value?.toIntOrNull()
+                    ?: DEFAULT_MINIMUM_ACCURACY
+                sensorDao.add(
+                    SensorSetting(
+                        backgroundLocation.id,
+                        SETTING_ACCURACY,
+                        minAccuracy.toString(),
+                    )
+                )
+                val accuracyThreshold = prefsRepository.getMinAccuracy()
+                if (accuracyThreshold != null && location.accuracy > accuracyThreshold) return@AMapLocationListener
+
+                val locationUpdate = UpdateLocation(
+                    locationName = "高德定位",
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    gpsAccuracy = if (location.accuracy != 0.0) location.accuracy else null,
+                    speed = if (location.speed != 0f) location.speed else null,
+                    altitude = if (location.altitude != 0.0) location.altitude else null,
+                    course = if (location.bearing != 0f) location.bearing else null,
+                    verticalAccuracy = if (Build.VERSION.SDK_INT >= 26) location.verticalAccuracyMeters else null
+                )
+                sendLocationUpdate(latestContext, locationUpdate, backgroundLocation, "location_update", true)
+            } else {
+                Log.e(TAG, "Amap Location Error: ${location.errorCode}, ${location.errorInfo}")
+            }
+        }
+        var amapLocation: AMapLocation? = null
 
         enum class LocationUpdateTrigger(val isGeofence: Boolean = false) {
             HIGH_ACCURACY_LOCATION,
@@ -668,37 +706,37 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
         Timber.d("Registering for location updates.")
         val amapKey = latestContext.getSharedPreferences("config", Context.MODE_PRIVATE)
             .getString("amapKey", "")
-        //if (amapKey.isNullOrEmpty() || amapKey == "0") {
+        if (!amapKey.isNullOrEmpty() && amapKey != "0") {
+            AMapLocationClient.updatePrivacyShow(latestContext, true, true)
+            AMapLocationClient.updatePrivacyAgree(latestContext, true)
+            AMapLocationClient.setApiKey(amapKey)
+
+            mLocationClient = AMapLocationClient(latestContext)
+
+            mLocationClient!!.setLocationListener(mLocationListener)
+            val mLocationOption = AMapLocationClientOption()
+
+            if (lastHighAccuracyMode) {
+                mLocationOption.locationMode =
+                    AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+            } else {
+                mLocationOption.locationMode =
+                    AMapLocationClientOption.AMapLocationMode.Battery_Saving
+            }
+            if (lastHighAccuracyUpdateInterval > 999999) {
+                mLocationOption.isOnceLocation = true
+                mLocationOption.isOnceLocationLatest = true
+            } else {
+                if (lastHighAccuracyUpdateInterval < 10) lastHighAccuracyUpdateInterval = 10
+                mLocationOption.interval = lastHighAccuracyUpdateInterval * 1000L
+                mLocationOption.isOnceLocation = false
+
+            }
+            mLocationClient!!.setLocationOption(mLocationOption)
+            mLocationClient!!.startLocation()
+        } else {
             getLocation(latestContext, amapKey == "0")
-//        } else {
-//            AMapLocationClient.updatePrivacyShow(latestContext, true, true)
-//            AMapLocationClient.updatePrivacyAgree(latestContext, true)
-//            AMapLocationClient.setApiKey(amapKey)
-//
-//            mLocationClient = AMapLocationClient(latestContext)
-//
-//            mLocationClient!!.setLocationListener(mLocationListener)
-//            val mLocationOption = AMapLocationClientOption()
-//
-//            if (lastHighAccuracyMode) {
-//                mLocationOption.locationMode =
-//                    AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-//            } else {
-//                mLocationOption.locationMode =
-//                    AMapLocationClientOption.AMapLocationMode.Battery_Saving
-//            }
-//            if (lastHighAccuracyUpdateInterval > 999999) {
-//                mLocationOption.isOnceLocation = true
-//                mLocationOption.isOnceLocationLatest = true
-//            } else {
-//                if (lastHighAccuracyUpdateInterval < 10) lastHighAccuracyUpdateInterval = 10
-//                mLocationOption.interval = lastHighAccuracyUpdateInterval * 1000L
-//                mLocationOption.isOnceLocation = false
-//
-//            }
-//            mLocationClient!!.setLocationOption(mLocationOption)
-//            mLocationClient!!.startLocation()
-//        }
+        }
 
     }
 
@@ -865,11 +903,11 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
         serverIds.forEach {
             lastLocationReceived[it] = System.currentTimeMillis()
         }
-//        if (mLocationClient != null) {
-//            mLocationClient?.startLocation()
-//        } else {
+        if (mLocationClient != null) {
+            mLocationClient?.startLocation()
+        } else {
             requestLocationUpdates()
-      //  }
+        }
     }
 
     override suspend fun getAvailableSensors(context: Context): List<SensorManager.BasicSensor> {
@@ -1169,42 +1207,42 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
             )
     }
 
-//    private fun addressUpdata(context: Context) {
-//        var addressStr = amapLocation!!.address
-//        val attributes = amapLocation.let {
-//            mapOf(
-//                "Administrative Area" to it!!.district,
-//                "Country" to it.city,
-//                "accuracy" to it.accuracy,
-//                "altitude" to it.altitude,
-//                "bearing" to it.bearing,
-//                "provider" to it.provider,
-//                "time" to it.time,
-//                "Locality" to it.province,
-//                "Latitude" to it.latitude,
-//                "Longitude" to it.longitude,
-//                "Postal Code" to it.cityCode,
-//                "Thoroughfare" to it.street,
-//                //"ISO Country Code" to it.cityCode,
-//                "vertical_accuracy" to if (Build.VERSION.SDK_INT >= 26) it.verticalAccuracyMeters.toInt() else 0,
-//            )
-//        }
-//        if (TextUtils.isEmpty(addressStr)) {
-//            addressStr =
-//                amapLocation!!.city + amapLocation!!.district + amapLocation!!.street + amapLocation!!.aoiName + amapLocation!!.floor
-//        }
-//        if (TextUtils.isEmpty(addressStr)) {
-//            Timber.d("addressStr--${amapLocation!!.locationDetail}")
-//            return
-//        }
-//        onSensorUpdated(
-//            context,
-//            GeocodeSensorManager.geocodedLocation,
-//            addressStr,
-//            "mdi:map",
-//            attributes,
-//        )
-//    }
+    private fun addressUpdata(context: Context) {
+        var addressStr = amapLocation!!.address
+        val attributes = amapLocation.let {
+            mapOf(
+                "Administrative Area" to it!!.district,
+                "Country" to it.city,
+                "accuracy" to it.accuracy,
+                "altitude" to it.altitude,
+                "bearing" to it.bearing,
+                "provider" to it.provider,
+                "time" to it.time,
+                "Locality" to it.province,
+                "Latitude" to it.latitude,
+                "Longitude" to it.longitude,
+                "Postal Code" to it.cityCode,
+                "Thoroughfare" to it.street,
+                //"ISO Country Code" to it.cityCode,
+                "vertical_accuracy" to if (Build.VERSION.SDK_INT >= 26) it.verticalAccuracyMeters.toInt() else 0,
+            )
+        }
+        if (TextUtils.isEmpty(addressStr)) {
+            addressStr =
+                amapLocation!!.city + amapLocation!!.district + amapLocation!!.street + amapLocation!!.aoiName + amapLocation!!.floor
+        }
+        if (TextUtils.isEmpty(addressStr)) {
+            Timber.d("addressStr--${amapLocation!!.locationDetail}")
+            return
+        }
+        onSensorUpdated(
+            context,
+            GeocodeSensorManager.geocodedLocation,
+            addressStr,
+            "mdi:map",
+            attributes,
+        )
+    }
 
 //    private fun logLocationUpdate(
 //        location: Location?,
