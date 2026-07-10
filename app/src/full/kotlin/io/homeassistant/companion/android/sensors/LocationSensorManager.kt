@@ -50,7 +50,6 @@ import io.homeassistant.companion.android.database.location.LocationHistoryItemT
 import io.homeassistant.companion.android.database.sensor.Attribute
 import io.homeassistant.companion.android.database.sensor.SensorSetting
 import io.homeassistant.companion.android.database.sensor.SensorSettingType
-import io.homeassistant.companion.android.database.AppDatabase
 import io.homeassistant.companion.android.database.sensor.toSensorWithAttributes
 import io.homeassistant.companion.android.location.HighAccuracyLocationService
 import io.homeassistant.companion.android.notifications.MessagingManager
@@ -180,43 +179,30 @@ class LocationSensorManager :  BroadcastReceiver(), SensorManager {
         private var lastHighAccuracyTriggerRange: Int = 0
         private var lastHighAccuracyZones: List<String> = ArrayList()
 
-        var mLocationClient: AMapLocationClient? = null
-        private var mLocationListener = AMapLocationListener { location ->
-            if (location.errorCode == 0) {
-                amapLocation = location
-                Log.d(TAG, "Amap Location -- ${location.latitude}")
-                addressUpdata(context = latestContext)
-                val sensorDao = AppDatabase.getInstance(latestContext).sensorDao()
-                val sensorSettings = sensorDao.getSettings(backgroundLocation.id)
-                val minAccuracy = sensorSettings
-                    .firstOrNull { it.name == SETTING_ACCURACY }?.value?.toIntOrNull()
-                    ?: DEFAULT_MINIMUM_ACCURACY
-                sensorDao.add(
-                    SensorSetting(
-                        backgroundLocation.id,
-                        SETTING_ACCURACY,
-                        minAccuracy.toString(),
-                    )
-                )
-                val accuracyThreshold = prefsRepository.getMinAccuracy()
-                if (accuracyThreshold != null && location.accuracy > accuracyThreshold) return@AMapLocationListener
+            var mLocationClient: AMapLocationClient? = null
+    private var mLocationListener = AMapLocationListener { location ->
+        if (location.errorCode == 0) {
+            amapLocation = location
+            Log.d(TAG, "Amap Location -- ${location.latitude}")
+            addressUpdata(context = latestContext)
 
-                val locationUpdate = UpdateLocation(
-                    locationName = "高德定位",
-                    latitude = location.latitude,
-                    longitude = location.longitude,
-                    gpsAccuracy = if (location.accuracy != 0.0) location.accuracy else null,
-                    speed = if (location.speed != 0f) location.speed else null,
-                    altitude = if (location.altitude != 0.0) location.altitude else null,
-                    course = if (location.bearing != 0f) location.bearing else null,
-                    verticalAccuracy = if (Build.VERSION.SDK_INT >= 26) location.verticalAccuracyMeters else null
-                )
-                sendLocationUpdate(latestContext, locationUpdate, backgroundLocation, "location_update", true)
-            } else {
-                Log.e(TAG, "Amap Location Error: ${location.errorCode}, ${location.errorInfo}")
-            }
+            val locationUpdate = UpdateLocation(
+                locationName = "高德定位",
+                latitude = location.latitude,
+                longitude = location.longitude,
+                gpsAccuracy = if (location.accuracy != 0.0) location.accuracy else null,
+                speed = if (location.speed != 0f) location.speed else null,
+                altitude = if (location.altitude != 0.0) location.altitude else null,
+                course = if (location.bearing != 0f) location.bearing else null,
+                verticalAccuracy = if (Build.VERSION.SDK_INT >= 26) location.verticalAccuracyMeters else null
+            )
+            sendLocationUpdate(latestContext, locationUpdate, backgroundLocation, "location_update", true)
+        } else {
+            Log.e(TAG, "Amap Location Error: ${location.errorCode}, ${location.errorInfo}")
         }
-        var amapLocation: AMapLocation? = null
+    }
+
+    var amapLocation: AMapLocation? = null
 
         enum class LocationUpdateTrigger(val isGeofence: Boolean = false) {
             HIGH_ACCURACY_LOCATION,
